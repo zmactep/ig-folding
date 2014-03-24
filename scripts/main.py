@@ -3,63 +3,9 @@ import argparse
 import re
 import subprocess
 import abc
+from Bio import SeqIO
 
 __author__ = 'Sergey Knyazev'
-
-
-class Fasta:
-    def __init__(self, name, sequence):
-        #this will store the sequence name
-        self.name = name
-        #this  will store the sequence itself
-        self.sequence = sequence
-
-
-#this function will receive the list with the file
-#contents, create instances of the Fasta class as
-#it scans the list, putting the sequence name on the
-#first attribute and the sequence itself on the second
-#attribute
-def read_fasta(fastafile):
-    #we declare an empty list that will store all
-    #Fasta class instances generated
-    with open(fastafile, 'r') as f:
-        file = f.readlines()
-        items = []
-        index = 0
-        aninstance = None
-        seq = ''
-        name = None
-        for line in file:
-        #we check to see if the line starts with a > sign
-            if line.startswith(">"):
-                #if so and our counter is large than 1
-                #we add the created class instance to our list
-                #a counter larger than 1 means we are reading
-                #from sequences 2 and above
-                if index >= 1:
-                    items.append(aninstance)
-                index += 1
-                #we add the line contents to a string
-                name = line[:-1]
-                #and initialize the string to store the sequence
-                seq = ''
-                #this creates a class instance and we add the attributes
-                #which are the strings name and seq
-                aninstance = Fasta(name, seq)
-            else:
-                #the line does not start with > so it has to be
-                #a sequence line, so we increment the string and
-                #add it to the created instance
-                seq += line[:-1]
-                aninstance = Fasta(name, seq)
-
-        #the loop before reads everything but the penultimate
-        #sequence is added at the end, so we need to add it
-        #after the loop ends
-        items.append(aninstance)
-        #a list with all read sequences is returned
-        return items
 
 
 class Chain:
@@ -219,7 +165,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    heavy_chain = HeavyChain(read_fasta(args.input_fasta)[0].sequence)
+    heavy_chain = HeavyChain(str(SeqIO.parse(args.input_fasta, "fasta").__next__().seq))
     fragments_homologs = find_fragments_homologs(heavy_chain, args)
 
 if __name__ == "__main__":
