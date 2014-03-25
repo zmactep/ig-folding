@@ -125,7 +125,16 @@ class LightChain(Chain):
 
 
 # TODO:
-def find_homolog(fasta, blast_parameters):
+def analyse_blast_output(blastfile,analyse_parameters):
+    with open(blastfile, 'r') as f:
+        blast_reader = ParseBlastTable.BlastTableReader(f)
+        for entrie in blast_reader.__next__().__dict__['entries']:
+            print(entrie.__dict__)
+    return ''
+    
+
+def find_homolog(fasta, blast_parameters, blast_analyse_parameters):
+    outfile = os.path.splitext(fasta)[0] + '.blast'
     blastall_cline = BlastallCommandline(cmd='blastall',
                                          infile=fasta,
                                          program='blastp',
@@ -134,9 +143,10 @@ def find_homolog(fasta, blast_parameters):
                                          matrix=blast_parameters.matrix,
                                          wordsize=blast_parameters.word_size,
                                          align_view=9,
-                                         outfile = os.path.splitext(fasta)[0] + '.blast',
+                                         outfile = outfile,
                                          alignments=blast_parameters.number_to_keep)
     blastall_cline()
+    return analyse_blast_output(outfile, blast_analyse_parameters)
 
 
 class BlastParameters():
@@ -149,6 +159,14 @@ class BlastParameters():
         self.number_to_keep = 600
 
 
+class BlastAnalyseParameters():
+    def __init__(self):
+        self.minimum_alingment_length_factor = 0.7
+        self.maximum_resolution = 2.8
+        self.perfect_seq_match_threshold = 105
+        self.max_length_deviation = 0
+
+
 def fragment_filename(fasta,database):
     name = os.path.splitext(fasta)
     return name[0] + os.path.splitext(database)[1] + name[1]
@@ -158,10 +176,10 @@ def write_fragment_fasta(name, sequence):
     with open(name, 'w') as f:
         SeqIO.write(SeqRecord(Seq(sequence,''),name,'',''),f,'fasta')
 
-        
-# TODO:
+
 def find_fragments_homologs(chain, args):
     blast_parameters = BlastParameters(args.database)
+    blast_analyse_parameters = BlastAnalyseParameters()
 
     blast_parameters.e_value = 0.00001
     blast_parameters.matrix = "BLOSUM62"
@@ -171,7 +189,7 @@ def find_fragments_homologs(chain, args):
     fasta = fragment_filename(args.input_fasta, blast_parameters.database_name)
     write_fragment_fasta(fasta, chain.fr1() + chain.fr2() + chain.fr3())
     
-    fr_homolog = find_homolog(fasta, blast_parameters)
+    fr_homolog = find_homolog(fasta, blast_parameters, blast_analyse_parameters)
     
     blast_parameters.e_value = 2000
     blast_parameters.matrix = "PAM30"
@@ -181,20 +199,21 @@ def find_fragments_homologs(chain, args):
     fasta = fragment_filename(args.input_fasta, blast_parameters.database_name)
     write_fragment_fasta(fasta, chain.cdr1())
     
-    cdr1_homolog = find_homolog(fasta, blast_parameters)
+    cdr1_homolog = find_homolog(fasta, blast_parameters, blast_analyse_parameters)
     
     blast_parameters.database_name = "database.h2"
     fasta = fragment_filename(args.input_fasta, blast_parameters.database_name)
     write_fragment_fasta(fasta, chain.cdr2())
     
-    cdr2_homolog = find_homolog(fasta, blast_parameters)
+    cdr2_homolog = find_homolog(fasta, blast_parameters, blast_analyse_parameters)
     
     blast_parameters.database_name = "database.h3"
     fasta = fragment_filename(args.input_fasta, blast_parameters.database_name)
     write_fragment_fasta(fasta, chain.cdr3())
     
-    cdr3_homolog = find_homolog(fasta, blast_parameters)
-    return ''
+    cdr3_homolog = find_homolog(fasta, blast_parameters, blast_analyse_parameters)
+    return dict(zip(['fr_homolog', 'cdr1_homolog', 'cdr2_homolog', 'cdr3_homolog'],
+                    [fr_homolog, cdr1_homolog, cdr2_homolog, cdr3_homolog]))
 
 
 def parse_args():
