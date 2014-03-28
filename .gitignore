@@ -34,3 +34,7 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+*.xml
+scripts/query_h.fasta
+*.name
+scripts/.idea/igFolder.iml

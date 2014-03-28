@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import argparse
 import re
-import subprocess
 import abc
 from Bio import SeqIO
 from Bio.Blast.Applications import BlastallCommandline
@@ -9,13 +8,14 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 from Bio.Blast import ParseBlastTable
 import os
+import copy
 
 
 HOME_DIR = '/opt/bio'
 ROSETTA_DIR = HOME_DIR + '/rosetta3.4'
 BASE_DIR = ROSETTA_DIR + '/Antibody'
 DATABASE = BASE_DIR + '/database'
-
+INFO = BASE_DIR + '/info'
 
 __author__ = 'Sergey Knyazev'
 
@@ -47,16 +47,16 @@ class Chain:
         self._annotate()
 
     def fr1(self):
-        return self.query[:self._cdr1_begin-1]
+        return self.query[:self._cdr1_begin - 1]
 
     def fr2(self):
-        return self.query[self._cdr1_begin+self._cdr1_length+1:self._cdr1_begin-1]
+        return self.query[self._cdr1_begin + self._cdr1_length + 1:self._cdr1_begin - 1]
 
     def fr3(self):
-        return self.query[self._cdr2_begin+self._cdr2_length+1:]
+        return self.query[self._cdr2_begin + self._cdr2_length + 1:]
 
     def cdr1(self):
-        return self.query[self._cdr1_begin:self._cdr1_begin+self._cdr1_length]
+        return self.query[self._cdr1_begin:self._cdr1_begin + self._cdr1_length]
 
     def cdr1_begin(self):
         return self._cdr1_begin
@@ -65,7 +65,7 @@ class Chain:
         return self._cdr1_length
 
     def cdr2(self):
-        return self.query[self._cdr2_begin:self._cdr2_begin+self._cdr2_length]
+        return self.query[self._cdr2_begin:self._cdr2_begin + self._cdr2_length]
 
     def cdr2_begin(self):
         return self._cdr2_begin
@@ -74,7 +74,7 @@ class Chain:
         return self._cdr2_length
 
     def cdr3(self):
-        return self.query[self._cdr3_begin:self._cdr3_begin+self._cdr3_length]
+        return self.query[self._cdr3_begin:self._cdr3_begin + self._cdr3_length]
 
     def cdr3_begin(self):
         return self._cdr3_begin
@@ -124,32 +124,7 @@ class LightChain(Chain):
         pass
 
 
-# TODO:
-def analyse_blast_output(blastfile,analyse_parameters):
-    with open(blastfile, 'r') as f:
-        blast_reader = ParseBlastTable.BlastTableReader(f)
-        for entrie in blast_reader.__next__().__dict__['entries']:
-            print(entrie.__dict__)
-    return ''
-    
-
-def find_homolog(fasta, blast_parameters, blast_analyse_parameters):
-    outfile = os.path.splitext(fasta)[0] + '.blast'
-    blastall_cline = BlastallCommandline(cmd='blastall',
-                                         infile=fasta,
-                                         program='blastp',
-                                         database=blast_parameters.database_path + '/' + blast_parameters.database_name,
-                                         expectation=blast_parameters.e_value,
-                                         matrix=blast_parameters.matrix,
-                                         wordsize=blast_parameters.word_size,
-                                         align_view=9,
-                                         outfile = outfile,
-                                         alignments=blast_parameters.number_to_keep)
-    blastall_cline()
-    return analyse_blast_output(outfile, blast_analyse_parameters)
-
-
-class BlastParameters():
+class BlastAlingmentParameters():
     def __init__(self, database_path):
         self.database_name = ''
         self.database_path = database_path
@@ -167,53 +142,113 @@ class BlastAnalyseParameters():
         self.max_length_deviation = 0
 
 
-def fragment_filename(fasta,database):
-    name = os.path.splitext(fasta)
-    return name[0] + os.path.splitext(database)[1] + name[1]
+class BlastAnalysis():
+    input_fasta = ''
 
+    #TODO:
+    @staticmethod
+    def init(input_fasta, info_path):
+        BlastAnalysis.input_fasta = input_fasta
+        BlastAnalysis.__init_database_info(info_path)
+        pass
 
-def write_fragment_fasta(name, sequence):
-    with open(name, 'w') as f:
-        SeqIO.write(SeqRecord(Seq(sequence,''),name,'',''),f,'fasta')
+    #TODO:
+    @staticmethod
+    def __init_database_info(info_path):
+        pass
+
+    @staticmethod
+    def __get_fasta_filename(fasta, database):
+        name = os.path.splitext(fasta)
+        return name[0] + os.path.splitext(database)[1] + name[1]
+
+    @staticmethod
+    def __write_fasta(name, sequence):
+        with open(name, 'w') as f:
+            SeqIO.write(SeqRecord(Seq(sequence, ''), name, '', ''), f, 'fasta')
+
+    @staticmethod
+    def __blast_fragment(fasta, blast_parameters):
+        outfile = os.path.splitext(fasta)[0] + '.blast'
+        blastall_cline = BlastallCommandline(cmd='blastall',
+                                             infile=fasta,
+                                             program='blastp',
+                                             database=
+                                             blast_parameters.database_path + '/' + blast_parameters.database_name,
+                                             expectation=blast_parameters.e_value,
+                                             matrix=blast_parameters.matrix,
+                                             wordsize=blast_parameters.word_size,
+                                             align_view=9,
+                                             outfile=outfile,
+                                             alignments=blast_parameters.number_to_keep)
+        blastall_cline()
+        return outfile
+
+    @staticmethod
+    # TODO:
+    def __analyse_blast_output(self, blastfile, analyse_parameters):
+        with open(blastfile, 'r') as f:
+            blast_reader = ParseBlastTable.BlastTableReader(f)
+            for entrie in blast_reader.__next__().__dict__['entries']:
+                print(entrie.__dict__)
+        return ''
+
+    def __init__(self, blast_alignment_parameters, blast_analysis_parameters, sequence):
+        self.blast_alignment_parameters = blast_alignment_parameters
+        self.blast_analysis_parameters = blast_analysis_parameters
+        self.sequence = sequence
+
+    # TODO:
+    def get_best_homolog(self):
+        fasta = self.__get_fasta_filename(BlastAnalysis.input_fasta, self.blast_alignment_parameters.database_name)
+        self.__write_fasta(fasta, self.sequence)
+        blast_file = self.__blast_fragment(fasta, self.blast_alignment_parameters)
+        return self.__analyse_blast_output(blast_file, self.blast_analysis_parameters)
 
 
 def find_fragments_homologs(chain, args):
-    blast_parameters = BlastParameters(args.database)
+    blast_fragments = dict()
+
+    BlastAnalysis.init(args.input_fasta, INFO)
+    blast_alignment_parameters = BlastAlingmentParameters(args.database)
     blast_analyse_parameters = BlastAnalyseParameters()
 
-    blast_parameters.e_value = 0.00001
-    blast_parameters.matrix = "BLOSUM62"
-    blast_parameters.word_size = 0
-    blast_parameters.database_name = "database.hfr"
-    
-    fasta = fragment_filename(args.input_fasta, blast_parameters.database_name)
-    write_fragment_fasta(fasta, chain.fr1() + chain.fr2() + chain.fr3())
-    
-    fr_homolog = find_homolog(fasta, blast_parameters, blast_analyse_parameters)
-    
-    blast_parameters.e_value = 2000
-    blast_parameters.matrix = "PAM30"
-    blast_parameters.word_size = 2
-    blast_parameters.database_name = "database.h1"
-    
-    fasta = fragment_filename(args.input_fasta, blast_parameters.database_name)
-    write_fragment_fasta(fasta, chain.cdr1())
-    
-    cdr1_homolog = find_homolog(fasta, blast_parameters, blast_analyse_parameters)
-    
-    blast_parameters.database_name = "database.h2"
-    fasta = fragment_filename(args.input_fasta, blast_parameters.database_name)
-    write_fragment_fasta(fasta, chain.cdr2())
-    
-    cdr2_homolog = find_homolog(fasta, blast_parameters, blast_analyse_parameters)
-    
-    blast_parameters.database_name = "database.h3"
-    fasta = fragment_filename(args.input_fasta, blast_parameters.database_name)
-    write_fragment_fasta(fasta, chain.cdr3())
-    
-    cdr3_homolog = find_homolog(fasta, blast_parameters, blast_analyse_parameters)
-    return dict(zip(['fr_homolog', 'cdr1_homolog', 'cdr2_homolog', 'cdr3_homolog'],
-                    [fr_homolog, cdr1_homolog, cdr2_homolog, cdr3_homolog]))
+    blast_alignment_parameters.e_value = 0.00001
+    blast_alignment_parameters.matrix = "BLOSUM62"
+    blast_alignment_parameters.word_size = 0
+    blast_alignment_parameters.database_name = "database.hfr"
+
+    blast_fragments["fr"] = BlastAnalysis(copy.deepcopy(blast_alignment_parameters),
+                                          copy.deepcopy(blast_analyse_parameters),
+                                          chain.fr1() + chain.fr2() + chain.fr3())
+
+    blast_alignment_parameters.e_value = 2000
+    blast_alignment_parameters.matrix = "PAM30"
+    blast_alignment_parameters.word_size = 2
+    blast_alignment_parameters.database_name = "database.h1"
+
+    blast_fragments["h1"] = BlastAnalysis(copy.deepcopy(blast_alignment_parameters),
+                                          copy.deepcopy(blast_analyse_parameters),
+                                          chain.cdr1())
+
+    blast_alignment_parameters.database_name = "database.h2"
+
+    blast_fragments["h2"] = BlastAnalysis(copy.deepcopy(blast_alignment_parameters),
+                                          copy.deepcopy(blast_analyse_parameters),
+                                          chain.cdr2())
+
+    blast_alignment_parameters.database_name = "database.h3"
+
+    blast_fragments["h3"] = BlastAnalysis(copy.deepcopy(blast_alignment_parameters),
+                                          copy.deepcopy(blast_analyse_parameters),
+                                          chain.cdr3())
+
+    results = dict()
+
+    for fragment in blast_fragments.keys():
+        results[fragment] = blast_fragments[fragment].get_best_homolog()
+
+    return results
 
 
 def parse_args():
@@ -229,6 +264,7 @@ def main():
     args = parse_args()
     heavy_chain = HeavyChain(str(SeqIO.parse(args.input_fasta, "fasta").__next__().seq))
     fragments_homologs = find_fragments_homologs(heavy_chain, args)
+
 
 if __name__ == "__main__":
     main()
