@@ -170,7 +170,7 @@ class BlastAnalyser():
 
     @staticmethod
     def __init_database_info(info_path):
-        with open(info_path + CDR_DATA_BASE, 'r') as f:
+        with open(info_path + BlastAnalyser.CDR_DATA_BASE, 'r') as f:
             for line in f:
                 filename, resol, lenl1, lenl2, lenl3, lenh1, lenh2, lenh3, \
                 seql1, seql2,seql3, seqh1, seqh2, seqh3, source, date, \
@@ -208,7 +208,7 @@ class BlastAnalyser():
         try:
             with open (info_path + BlastAnalyser.LIGHT_HEAVY_LENGTH_FILE, 'r' ) as f:
                 for line in f:
-                    filename , chaintype , length = line.split()
+                    filename , chaintype , length = line.split(' ')
                     BlastAnalyser.length[filename + chaintype] = length
         except EnvironmentError:
             print('Exiting. File ' + info_path + BlastAnalyser.LIGHT_HEAVY_LENGTH_FILE + ' not found\n')
